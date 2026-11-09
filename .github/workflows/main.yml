@@ -17,20 +17,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download latest project ZIP
+      - name: Find and extract latest ZIP
         run: |
-          curl -L --fail \
-            "PROJECT_ZIP_URL" \
-            -o NovaBrowser.zip
+          ZIP=$(find . -maxdepth 2 -type f \
+            -name 'NovaBrowser-*.zip' | sort -V | tail -n 1)
 
-      - name: Extract project
-        run: |
-          mkdir project
-          unzip -o NovaBrowser.zip -d project
+          if [ -z "$ZIP" ]; then
+            echo "NovaBrowser ZIP not found!"
+            exit 1
+          fi
 
-      - name: Locate Gradle project
-        run: |
-          find project -name settings.gradle.kts
+          echo "Selected: $ZIP"
+          mkdir extracted
+          unzip -o "$ZIP" -d extracted
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -38,17 +37,27 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
       - name: Build APK
-        working-directory: project/NovaBrowser
         run: |
-          gradle --version
+          PROJECT=$(find extracted -name settings.gradle.kts \
+            -printf '%h\n' | head -n 1)
+
+          if [ -z "$PROJECT" ]; then
+            echo "Gradle project not found!"
+            exit 1
+          fi
+
+          cd "$PROJECT"
           gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NovaBrowser-debug
-          path: project/NovaBrowser/app/build/outputs/apk/debug/app-debug.apk
+          name: NovaBrowser-APK
+          path: extracted/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

@@ -1,0 +1,54 @@
+name: Build Nova Browser APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download latest project ZIP
+        run: |
+          curl -L --fail \
+            "PROJECT_ZIP_URL" \
+            -o NovaBrowser.zip
+
+      - name: Extract project
+        run: |
+          mkdir project
+          unzip -o NovaBrowser.zip -d project
+
+      - name: Locate Gradle project
+        run: |
+          find project -name settings.gradle.kts
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        working-directory: project/NovaBrowser
+        run: |
+          gradle --version
+          gradle assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NovaBrowser-debug
+          path: project/NovaBrowser/app/build/outputs/apk/debug/app-debug.apk
